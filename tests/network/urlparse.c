@@ -22,6 +22,10 @@ void test_network_urlparse__cleanup(void)
 	gitno_connection_data_free_ptrs(&conndata);
 }
 
+/*
+ * example.com based tests
+ */
+
 void test_network_urlparse__trivial(void)
 {
 	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
@@ -217,4 +221,450 @@ void test_network_urlparse__connection_data_cleanup(void)
 				"http://foo.com/bar/baz/biff", "baz/biff"));
 	cl_git_pass(gitno_connection_data_from_url(&conndata,
 				"https://foo.com/bar/baz/biff", "baz/biff"));
+}
+
+/*
+ * IPv4 based tests
+ */
+
+void test_network_urlparse__trivial_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"http://192.168.1.1/resource", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_p(user, NULL);
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__root_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"http://192.168.1.1/", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/");
+	cl_assert_equal_p(user, NULL);
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__just_hostname_ipv4(void)
+{
+	cl_git_fail_with(GIT_EINVALIDSPEC,
+		gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+			"http://192.168.1.1", "8080"));
+}
+
+void test_network_urlparse__encoded_password_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass%2fis%40bad@192.168.1.1:1234/", "1"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "1234");
+	cl_assert_equal_s(path, "/");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_s(pass, "pass/is@bad");
+}
+
+void test_network_urlparse__user_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user@192.168.1.1/resource", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__user_pass_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass@192.168.1.1/resource", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_s(pass, "pass");
+}
+
+void test_network_urlparse__port_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://192.168.1.1:9191/resource", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "9191");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_p(user, NULL);
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__user_port_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user@192.168.1.1:9191/resource", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "9191");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__user_pass_port_ipv4(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass@192.168.1.1:9191/resource", "8080"));
+	cl_assert_equal_s(host, "192.168.1.1");
+	cl_assert_equal_s(port, "9191");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_s(pass, "pass");
+}
+
+void test_network_urlparse__optional_path_ipv4(void)
+{
+	cl_git_fail(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass@192.168.1.1:9191", "8080"));
+
+	cl_git_pass(gitno_extract_url_parts(&host, &port, NULL, &user, &pass,
+		"https://user:pass@192.168.1.1:9191", "8080"));
+}
+
+void test_network_urlparse__connection_data_http_ipv4(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"http://192.168.1.1/foo/bar/baz", "bar/baz"));
+	cl_assert_equal_s(conndata.host, "192.168.1.1");
+	cl_assert_equal_s(conndata.port, "80");
+	cl_assert_equal_s(conndata.path, "/foo/");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, false);
+}
+
+void test_network_urlparse__connection_data_ssl_ipv4(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://192.168.1.1/foo/bar/baz", "bar/baz"));
+	cl_assert_equal_s(conndata.host, "192.168.1.1");
+	cl_assert_equal_s(conndata.port, "443");
+	cl_assert_equal_s(conndata.path, "/foo/");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, true);
+}
+
+void test_network_urlparse__encoded_username_password_ipv4(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://user%2fname:pass%40word%zyx%v@192.168.1.1/foo/bar/baz", "bar/baz"));
+	cl_assert_equal_s(conndata.host, "192.168.1.1");
+	cl_assert_equal_s(conndata.port, "443");
+	cl_assert_equal_s(conndata.path, "/foo/");
+	cl_assert_equal_s(conndata.user, "user/name");
+	cl_assert_equal_s(conndata.pass, "pass@word%zyx%v");
+	cl_assert_equal_i(conndata.use_ssl, true);
+}
+
+void test_network_urlparse__connection_data_cross_host_redirect_ipv4(void)
+{
+	conndata.host = git__strdup("bar.com");
+	cl_git_fail_with(gitno_connection_data_from_url(&conndata,
+		"https://192.168.1.1/bar/baz", NULL),
+		-1);
+}
+
+void test_network_urlparse__connection_data_http_downgrade_ipv4(void)
+{
+	conndata.use_ssl = true;
+	cl_git_fail_with(gitno_connection_data_from_url(&conndata,
+		"http://192.168.1.1/bar/baz", NULL),
+		-1);
+}
+
+void test_network_urlparse__connection_data_relative_redirect_ipv4(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"http://192.168.1.1/bar/baz/biff", NULL));
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"/zap/baz/biff?bam", NULL));
+	cl_assert_equal_s(conndata.host, "192.168.1.1");
+	cl_assert_equal_s(conndata.port, "80");
+	cl_assert_equal_s(conndata.path, "/zap/baz/biff?bam");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, false);
+}
+
+void test_network_urlparse__connection_data_relative_redirect_ssl_ipv4(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://192.168.1.1/bar/baz/biff", NULL));
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"/zap/baz/biff?bam", NULL));
+	cl_assert_equal_s(conndata.host, "192.168.1.1");
+	cl_assert_equal_s(conndata.port, "443");
+	cl_assert_equal_s(conndata.path, "/zap/baz/biff?bam");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, true);
+}
+
+/* Run this under valgrind */
+void test_network_urlparse__connection_data_cleanup_ipv4(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"http://192.168.1.1/bar/baz/biff", "baz/biff"));
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://192.168.1.1/bar/baz/biff", "baz/biff"));
+}
+
+/*
+ * IPv6 based tests
+ */
+
+void test_network_urlparse__trivial_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"http://[fe80::dcad:beff:fe00:0001]/resource", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_p(user, NULL);
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__root_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"http://[fe80::dcad:beff:fe00:0001]/", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/");
+	cl_assert_equal_p(user, NULL);
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__just_hostname_ipv6(void)
+{
+	cl_git_fail_with(GIT_EINVALIDSPEC,
+		gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+			"http://[fe80::dcad:beff:fe00:0001]", "8080"));
+}
+
+void test_network_urlparse__encoded_password_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass%2fis%40bad@[fe80::dcad:beff:fe00:0001]:1234/", "1"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "1234");
+	cl_assert_equal_s(path, "/");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_s(pass, "pass/is@bad");
+}
+
+void test_network_urlparse__user_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user@[fe80::dcad:beff:fe00:0001]/resource", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__user_pass_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass@[fe80::dcad:beff:fe00:0001]/resource", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "8080");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_s(pass, "pass");
+}
+
+void test_network_urlparse__port_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://[fe80::dcad:beff:fe00:0001]:9191/resource", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "9191");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_p(user, NULL);
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__user_port_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user@[fe80::dcad:beff:fe00:0001]:9191/resource", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "9191");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_p(pass, NULL);
+}
+
+void test_network_urlparse__user_pass_port_ipv6(void)
+{
+	cl_git_pass(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass@[fe80::dcad:beff:fe00:0001]:9191/resource", "8080"));
+#ifdef WIN32
+	cl_assert_equal_s(host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(port, "9191");
+	cl_assert_equal_s(path, "/resource");
+	cl_assert_equal_s(user, "user");
+	cl_assert_equal_s(pass, "pass");
+}
+
+void test_network_urlparse__optional_path_ipv6(void)
+{
+	cl_git_fail(gitno_extract_url_parts(&host, &port, &path, &user, &pass,
+		"https://user:pass@[fe80::dcad:beff:fe00:0001]:9191", "8080"));
+
+	cl_git_pass(gitno_extract_url_parts(&host, &port, NULL, &user, &pass,
+		"https://user:pass@[fe80::dcad:beff:fe00:0001]:9191", "8080"));
+}
+
+void test_network_urlparse__connection_data_http_ipv6(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"http://[fe80::dcad:beff:fe00:0001]/foo/bar/baz", "bar/baz"));
+#ifdef WIN32
+	cl_assert_equal_s(conndata.host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(conndata.host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(conndata.port, "80");
+	cl_assert_equal_s(conndata.path, "/foo/");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, false);
+}
+
+void test_network_urlparse__connection_data_ssl_ipv6(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://[fe80::dcad:beff:fe00:0001]/foo/bar/baz", "bar/baz"));
+#ifdef WIN32
+	cl_assert_equal_s(conndata.host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(conndata.host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(conndata.port, "443");
+	cl_assert_equal_s(conndata.path, "/foo/");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, true);
+}
+
+void test_network_urlparse__encoded_username_password_ipv6(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://user%2fname:pass%40word%zyx%v@[fe80::dcad:beff:fe00:0001]/foo/bar/baz", "bar/baz"));
+#ifdef WIN32
+	cl_assert_equal_s(conndata.host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(conndata.host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(conndata.port, "443");
+	cl_assert_equal_s(conndata.path, "/foo/");
+	cl_assert_equal_s(conndata.user, "user/name");
+	cl_assert_equal_s(conndata.pass, "pass@word%zyx%v");
+	cl_assert_equal_i(conndata.use_ssl, true);
+}
+
+void test_network_urlparse__connection_data_cross_host_redirect_ipv6(void)
+{
+	conndata.host = git__strdup("bar.com");
+	cl_git_fail_with(gitno_connection_data_from_url(&conndata,
+		"https://[fe80::dcad:beff:fe00:0001]/bar/baz", NULL),
+		-1);
+}
+
+void test_network_urlparse__connection_data_http_downgrade_ipv6(void)
+{
+	conndata.use_ssl = true;
+	cl_git_fail_with(gitno_connection_data_from_url(&conndata,
+		"http://[fe80::dcad:beff:fe00:0001]/bar/baz", NULL),
+		-1);
+}
+
+void test_network_urlparse__connection_data_relative_redirect_ipv6(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"http://[fe80::dcad:beff:fe00:0001]/bar/baz/biff", NULL));
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"/zap/baz/biff?bam", NULL));
+#ifdef WIN32
+	cl_assert_equal_s(conndata.host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(conndata.host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(conndata.port, "80");
+	cl_assert_equal_s(conndata.path, "/zap/baz/biff?bam");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, false);
+}
+
+void test_network_urlparse__connection_data_relative_redirect_ssl_ipv6(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://[fe80::dcad:beff:fe00:0001]/bar/baz/biff", NULL));
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"/zap/baz/biff?bam", NULL));
+#ifdef WIN32
+	cl_assert_equal_s(conndata.host, "[fe80::dcad:beff:fe00:0001]");
+#else
+	cl_assert_equal_s(conndata.host, "fe80::dcad:beff:fe00:0001");
+#endif
+	cl_assert_equal_s(conndata.port, "443");
+	cl_assert_equal_s(conndata.path, "/zap/baz/biff?bam");
+	cl_assert_equal_p(conndata.user, NULL);
+	cl_assert_equal_p(conndata.pass, NULL);
+	cl_assert_equal_i(conndata.use_ssl, true);
+}
+
+/* Run this under valgrind */
+void test_network_urlparse__connection_data_cleanup_ipv6(void)
+{
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"http://[fe80::dcad:beff:fe00:0001]/bar/baz/biff", "baz/biff"));
+	cl_git_pass(gitno_connection_data_from_url(&conndata,
+		"https://[fe80::dcad:beff:fe00:0001]/bar/baz/biff", "baz/biff"));
 }
